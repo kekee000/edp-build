@@ -25,7 +25,7 @@ var ProcessorBase = require('./lib/processor/abstract');
 var ProcessContext = require('./lib/process-context');
 var FileInfo = require('./lib/file-info');
 var helper = require('./lib/helper');
-
+var filecache = require('./lib/filecache');
 
 /**
  * 遍历目录
@@ -141,6 +141,17 @@ function main(conf, callback) {
     var baseDir = conf.input;
     var outputDir = conf.output;
     var fileEncodings = conf.fileEncodings || {};
+    var cacheConfig = conf.cacheConfig;
+    if (cacheConfig) {
+        cacheConfig = u.extend({
+            dir: '.compile-cache'
+        }, cacheConfig);
+        exclude.push(cacheConfig.dir);
+        processReadCache(cacheConfig);
+    }
+    else {
+        exclude.push('.compile-cache');
+    }
 
     injectProcessor(conf);
 
@@ -175,6 +186,9 @@ function main(conf, callback) {
 
     function nextProcess() {
         if (processorIndex >= processorCount) {
+            if (cacheConfig) {
+                processWriteCache(cacheConfig);
+            }
             outputFiles();
             return;
         }
@@ -195,7 +209,19 @@ function main(conf, callback) {
 
     nextProcess();
 
+    function processReadCache(config) {
+        filecache.load(config);
+        edp.log.info('read compile cache files from ', config.dir);
+    }
+
+
+    function processWriteCache(config) {
+        filecache.save(config);
+        edp.log.info('write compile cache files to ', config.dir);
+    }
+
     function outputFiles() {
+        var filecache = require('./lib/filecache');
         processContext.getFiles().forEach(function (file) {
             if (file.outputPath) {
                 var fileBuffer = file.getDataBuffer();
